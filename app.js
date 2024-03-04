@@ -104,7 +104,6 @@ app.post('/form/save-details', (req, res) => {
   });
 });
 
-
 app.get('/form/list', (req, res) => {
   connection.query('select * from form order by form_id desc', (error, rows) => {
     if (error) {

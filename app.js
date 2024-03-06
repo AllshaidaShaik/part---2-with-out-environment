@@ -9,7 +9,7 @@ const connection = mysql.createConnection({
   host: '127.0.0.1',
   user: 'root',
   password: 'root@123',
-  database: 'database'
+  database: 'contact'
 });
 
 connection.connect(err => {
@@ -69,51 +69,104 @@ app.post('/login', (req, res) => {
   });
 });
 
-app.post('/form/save-details', (req, res) => {
-  const { first_name, middle_name, last_name, address, country, state, city, zip_code, email, phone_number, height, height_type, weight } = req.body;
-
-  connection.query('SELECT * FROM form WHERE email = ?', [email], (error, rows) => {
+function createTableIfNotExists() {
+  connection.query(`CREATE TABLE IF NOT EXISTS form (
+    form_id INT AUTO_INCREMENT PRIMARY KEY,
+    first_name VARCHAR(255) NOT NULL,
+    middle_name VARCHAR(255) NOT NULL,
+    last_name VARCHAR(255) NOT NULL,
+    address VARCHAR(255) NOT NULL,
+    country VARCHAR(255) NOT NULL,
+    state VARCHAR(255) NOT NULL,
+    city VARCHAR(255) NOT NULL,
+    zip_code VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    phone_number VARCHAR(255) NOT NULL,
+    height VARCHAR(255) NOT NULL,
+    height_type VARCHAR(255) NOT NULL,
+    weight VARCHAR(255) NOT NULL,
+    active INT NOT NULL,
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`, (error, results) => {
     if (error) {
-      console.error('Error checking email existence in database:', error);
+      console.error('Error creating table:', error);
+      return;
+    }
+    console.log('Table created successfully');
+  });
+}
+
+app.post('/form/save-details', (req, res) => {
+  connection.query('SHOW TABLES LIKE "form"', (error, results) => {
+    if (error) {
+      console.error('Error:', error);
       return res.status(500).json({ error: 'Internal Server Error' });
     }
 
-    if (rows.length > 0) {
-      return res.json({ error: 'Email already exists' });
+    if (results.length === 0) {
+      createTableIfNotExists();
     }
 
-    connection.query('INSERT INTO form (first_name, middle_name, last_name, address, country, state, city, zip_code, email, phone_number, height, height_type, weight, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [first_name, middle_name, last_name, address, country, state, city, zip_code, email, phone_number, height, height_type, weight, 1],
-      (error, results) => {
-        if (error) {
-          console.error('Error inserting data into database:', error);
-          return res.status(500).json({ error: 'Internal Server Error' });
-        }
+    const { first_name, middle_name, last_name, address, country, state, city, zip_code, email, phone_number, height, height_type, weight } = req.body;
 
-        const insertedId = results.insertId;
-        connection.query('SELECT * FROM form WHERE form_id = ?', [insertedId], (err, rows) => {
-          if (err) {
-            console.error('Error retrieving inserted data from database:', err);
+    connection.query('SELECT * FROM form WHERE email = ?', [email], (error, rows) => {
+      if (error) {
+        console.error('Error:', error);
+        return res.status(500).json({ error: 'Internal Server Error' });
+      }
+
+      if (rows.length > 0) {
+        return res.json({ error: 'Email already exists' });
+      }
+
+      connection.query('INSERT INTO form (first_name, middle_name, last_name, address, country, state, city, zip_code, email, phone_number, height, height_type, weight, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [first_name, middle_name, last_name, address, country, state, city, zip_code, email, phone_number, height, height_type, weight, 1],
+        (error, results) => {
+          if (error) {
+            console.error('Error', error);
             return res.status(500).json({ error: 'Internal Server Error' });
           }
 
-          const insertedData = rows[0];
-          res.json({ message: 'Form details saved successfully', data: insertedData });
+          const insertedId = results.insertId;
+          connection.query('SELECT * FROM form WHERE form_id = ?', [insertedId], (err, rows) => {
+            if (err) {
+              console.error('Error:', err);
+              return res.status(500).json({ error: 'Internal Server Error' });
+            }
+
+            const insertedData = rows[0];
+            res.json({ message: 'Form details saved successfully', data: insertedData });
+          });
         });
-      });
+    });
   });
 });
 
 app.get('/form/list', (req, res) => {
-  connection.query('select * from form order by form_id desc', (error, rows) => {
-    if (error) {
-      console.error('Error', error);
+  connection.query('SHOW TABLES LIKE "form"', (err, result) => {
+    if (err) {
+      console.error('Error:', err);
       res.status(500).json({ error: 'Internal Server Error' });
       return;
     }
-    res.json({ data: rows });
+
+    if (result.length === 0) {
+      res.json({ error: 'No table existing' });
+      return;
+    }
+
+    connection.query('SELECT * FROM form ORDER BY form_id DESC', (error, rows) => {
+      if (error) {
+        console.error('Error:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+        return;
+      }
+      res.json({ data: rows });
+    });
   });
 });
+
 
 app.delete('/form/delete-details/:id', (req, res) => {
   const formId = req.params.id;
